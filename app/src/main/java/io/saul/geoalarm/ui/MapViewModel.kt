@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import io.saul.geoalarm.data.DeliveryMode
 import io.saul.geoalarm.data.Fence
 import io.saul.geoalarm.data.GeoAlarmDatabase
+import io.saul.geoalarm.data.Schedule
 import io.saul.geoalarm.data.Settings
+import io.saul.geoalarm.data.TriggerLog
 import io.saul.geoalarm.engine.GeoMath
 import io.saul.geoalarm.engine.GeoPoint
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,11 @@ data class FenceDraft(
     val mode: DeliveryMode = DeliveryMode.ALARM,
     val enabled: Boolean = true,
     val note: String = "",
+    val repeat: Boolean = true,
+    val activeDays: Int = Schedule.ALL_DAYS,
+    val windowStartMinutes: Int? = null,
+    val windowEndMinutes: Int? = null,
+    val soundUri: String? = null,
 ) {
     fun toFence() = Fence(
         id = id,
@@ -39,14 +46,21 @@ data class FenceDraft(
         mode = mode,
         enabled = enabled,
         note = note,
+        repeat = repeat,
+        activeDays = activeDays,
+        windowStartMinutes = windowStartMinutes,
+        windowEndMinutes = windowEndMinutes,
+        soundUri = soundUri,
     )
 
-    val canSave: Boolean get() = onEnter || onExit
+    val canSave: Boolean get() = (onEnter || onExit) && activeDays != 0
 
     companion object {
         fun from(f: Fence) = FenceDraft(
             id = f.id, center = GeoPoint(f.latitude, f.longitude), radiusMeters = f.radiusMeters,
             label = f.label, onEnter = f.onEnter, onExit = f.onExit, mode = f.mode, enabled = f.enabled, note = f.note,
+            repeat = f.repeat, activeDays = f.activeDays, windowStartMinutes = f.windowStartMinutes,
+            windowEndMinutes = f.windowEndMinutes, soundUri = f.soundUri,
         )
     }
 }
@@ -57,6 +71,10 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
 
     val fences: StateFlow<List<Fence>> =
         dao.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val history: StateFlow<List<TriggerLog>> =
+        GeoAlarmDatabase.get(app).triggerLogDao().observeRecent()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _draft = MutableStateFlow<FenceDraft?>(null)
     val draft: StateFlow<FenceDraft?> = _draft.asStateFlow()
@@ -95,7 +113,8 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveDraft() {
-        val d = _draft.value?.takeIf { it.canSave } ?: return
+        // Saving re-enables a one-shot fence that already fired.
+        val d = _draft.value?.takeIf { it.canSave }?.copy(enabled = true) ?: return
         viewModelScope.launch {
             dao.upsert(d.toFence())
             _draft.value = null

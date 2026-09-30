@@ -65,6 +65,11 @@ android {
     }
 }
 
+// Room schema history, checked in so migrations can be verified.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.06.01")
     implementation(composeBom)

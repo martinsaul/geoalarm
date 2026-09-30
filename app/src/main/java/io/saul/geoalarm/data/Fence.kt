@@ -17,4 +17,13 @@ data class Fence(
     val mode: DeliveryMode = DeliveryMode.ALARM,
     val enabled: Boolean = true,
     val note: String = "",
+    /** false = one-shot: the fence disables itself after it fires once. */
+    val repeat: Boolean = true,
+    /** Bit 0 = Monday ... bit 6 = Sunday. [Schedule.ALL_DAYS] means every day. */
+    val activeDays: Int = Schedule.ALL_DAYS,
+    /** Optional daily window in minutes after midnight; both null = all day. End < start wraps past midnight. */
+    val windowStartMinutes: Int? = null,
+    val windowEndMinutes: Int? = null,
+    /** Alarm sound (content URI); null = system default alarm. */
+    val soundUri: String? = null,
 )

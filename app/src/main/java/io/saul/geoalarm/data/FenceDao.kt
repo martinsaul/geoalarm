@@ -14,6 +14,9 @@ interface FenceDao {
     @Query("SELECT * FROM fences WHERE enabled = 1")
     suspend fun enabled(): List<Fence>
 
+    @Query("SELECT * FROM fences WHERE id = :id")
+    suspend fun byId(id: Long): Fence?
+
     @Upsert
     suspend fun upsert(fence: Fence): Long
 

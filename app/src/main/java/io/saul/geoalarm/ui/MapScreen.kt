@@ -67,6 +67,7 @@ fun MapScreen(modifier: Modifier = Modifier, vm: MapViewModel = viewModel()) {
     val fences by vm.fences.collectAsStateWithLifecycle()
     val draft by vm.draft.collectAsStateWithLifecycle()
     val styleUrl by vm.styleUrl.collectAsStateWithLifecycle()
+    val history by vm.history.collectAsStateWithLifecycle()
 
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
@@ -189,7 +190,12 @@ fun MapScreen(modifier: Modifier = Modifier, vm: MapViewModel = viewModel()) {
             }
         }
 
-        Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp).fillMaxWidth()) {
+        Column(
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Only nag once there's something to protect.
+            if (draft == null && fences.any { it.enabled }) PermissionSteps()
             val d = draft
             if (d != null) {
                 FenceEditor(
@@ -233,6 +239,7 @@ fun MapScreen(modifier: Modifier = Modifier, vm: MapViewModel = viewModel()) {
     if (showList) {
         FenceListSheet(
             fences = fences,
+            history = history,
             onDismiss = { showList = false },
             onSelect = { f ->
                 showList = false

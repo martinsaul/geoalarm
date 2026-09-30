@@ -26,35 +26,72 @@ import androidx.compose.ui.unit.dp
 import io.saul.geoalarm.BuildConfig
 import io.saul.geoalarm.data.DeliveryMode
 import io.saul.geoalarm.data.Fence
+import io.saul.geoalarm.data.Schedule
+import io.saul.geoalarm.data.TriggerLog
+import io.saul.geoalarm.data.TriggerOutcome
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.runtime.mutableIntStateOf
 import io.saul.geoalarm.engine.GeoPoint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FenceListSheet(
     fences: List<Fence>,
+    history: List<TriggerLog>,
     onDismiss: () -> Unit,
     onSelect: (Fence) -> Unit,
     onToggle: (Fence, Boolean) -> Unit,
 ) {
+    var tab by remember { mutableIntStateOf(0) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        if (fences.isEmpty()) {
-            Text("No fences yet. Tap the map to add one.", Modifier.padding(24.dp))
+        PrimaryTabRow(selectedTabIndex = tab) {
+            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Fences") })
+            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("History") })
         }
-        LazyColumn(Modifier.navigationBarsPadding()) {
-            items(fences, key = { it.id }) { f ->
-                ListItem(
-                    headlineContent = { Text(f.label) },
-                    supportingContent = {
-                        val trigger = listOfNotNull("arrive".takeIf { f.onEnter }, "leave".takeIf { f.onExit }).joinToString(" + ")
-                        val mode = if (f.mode == DeliveryMode.ALARM) "Alarm" else "Reminder"
-                        Text("${RadiusScale.label(f.radiusMeters)} - $mode on $trigger")
-                    },
-                    trailingContent = { Switch(checked = f.enabled, onCheckedChange = { onToggle(f, it) }) },
-                    modifier = Modifier.clickable { onSelect(f) },
-                )
+        if (tab == 0) {
+            if (fences.isEmpty()) Text("No fences yet. Tap the map to add one.", Modifier.padding(24.dp))
+            LazyColumn(Modifier.navigationBarsPadding()) {
+                items(fences, key = { it.id }) { f ->
+                    ListItem(
+                        headlineContent = { Text(f.label) },
+                        supportingContent = {
+                            val trigger = listOfNotNull("arrive".takeIf { f.onEnter }, "leave".takeIf { f.onExit }).joinToString(" + ")
+                            val mode = if (f.mode == DeliveryMode.ALARM) "Alarm" else "Reminder"
+                            val extras = listOfNotNull(Schedule.describe(f), "once".takeIf { !f.repeat })
+                            Text((listOf("${RadiusScale.label(f.radiusMeters)} - $mode on $trigger") + extras).joinToString(" - "))
+                        },
+                        trailingContent = { Switch(checked = f.enabled, onCheckedChange = { onToggle(f, it) }) },
+                        modifier = Modifier.clickable { onSelect(f) },
+                    )
+                }
+            }
+        } else {
+            if (history.isEmpty()) Text("Nothing has fired yet.", Modifier.padding(24.dp))
+            val fmt = remember { DateTimeFormatter.ofPattern("EEE d MMM, HH:mm") }
+            LazyColumn(Modifier.navigationBarsPadding()) {
+                items(history, key = { it.id }) { h ->
+                    val time = Instant.ofEpochMilli(h.timestampMillis).atZone(ZoneId.systemDefault()).format(fmt)
+                    ListItem(
+                        headlineContent = { Text("${if (h.entered) "Arrived" else "Left"}: ${h.label}") },
+                        supportingContent = { Text("$time - ${h.outcome.describe()}") },
+                    )
+                }
             }
         }
     }
+}
+
+private fun TriggerOutcome.describe() = when (this) {
+    TriggerOutcome.RANG -> "alarm rang"
+    TriggerOutcome.NOTIFIED -> "notified"
+    TriggerOutcome.SKIPPED_SCHEDULE -> "skipped (outside schedule)"
+    TriggerOutcome.DISMISSED -> "dismissed"
+    TriggerOutcome.SNOOZED -> "snoozed"
+    TriggerOutcome.TIMED_OUT -> "missed"
 }
 
 @Composable

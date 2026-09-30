@@ -7,9 +7,15 @@ package io.saul.geoalarm.engine
  * radius + [exitMarginMeters]. Location fixes worse than their own accuracy are handled by
  * widening that margin, so GPS jitter at the edge doesn't flap the alarm.
  */
-class FenceTracker(private val exitMarginMeters: Double = 25.0) {
+class FenceTracker(
+    private val exitMarginMeters: Double = 25.0,
+    initialState: Map<Long, Boolean> = emptyMap(),
+) {
 
-    private val inside = mutableMapOf<Long, Boolean>()
+    private val inside = initialState.toMutableMap()
+
+    /** Current inside/outside state per fence, for persisting across process death. */
+    fun snapshot(): Map<Long, Boolean> = inside.toMap()
 
     /** Returns the transitions caused by this fix, in fence order. The first fix only establishes state. */
     fun onFix(position: GeoPoint, accuracyMeters: Double, fences: List<FenceSpec>): List<Pair<FenceSpec, Transition>> {

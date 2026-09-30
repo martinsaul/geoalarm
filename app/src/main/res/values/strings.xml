@@ -1,3 +1,20 @@
 <resources>
     <string name="app_name">GeoAlarm</string>
+
+    <string name="channel_tracking">Location monitoring</string>
+    <string name="channel_reminders">Reminders</string>
+    <string name="channel_alarms">Alarms</string>
+
+    <string name="tracking_title">Watching your fences</string>
+    <string name="tracking_text">GeoAlarm uses GPS to know when you arrive or leave. Works without internet.</string>
+
+    <string name="alert_arrived">Arrived: %1$s</string>
+    <string name="alert_left">Left: %1$s</string>
+
+    <string name="alarm_snooze">Snooze 5 min</string>
+    <string name="alarm_dismiss">Dismiss</string>
+    <string name="alarm_tap_to_open">Tap to open the alarm</string>
+    <string name="alarm_arrived_heading">You\'ve arrived</string>
+    <string name="alarm_left_heading">You\'ve left</string>
+    <string name="alarm_missed">Missed alarm: %1$s</string>
 </resources>
