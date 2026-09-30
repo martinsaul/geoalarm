@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Test, lint, assemble (both flavors)
+        run: ./gradlew --no-daemon testFdroidDebugUnitTest testGmsDebugUnitTest lintFdroidDebug lintGmsDebug assembleFdroidRelease assembleGmsRelease
+      - name: fdroid flavor has no proprietary dependencies
+        run: |
+          if ./gradlew --no-daemon -q :app:dependencies --configuration fdroidReleaseRuntimeClasspath | grep -Ei 'com\.google\.android\.gms|com\.google\.firebase'; then
+            echo "Proprietary dependency leaked into the fdroid flavor"; exit 1
+          fi
