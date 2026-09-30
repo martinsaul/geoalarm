@@ -69,8 +69,10 @@ fun FenceEditor(
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.6f).dp
 
     Card(Modifier.fillMaxWidth()) {
+      Column(Modifier.heightIn(max = maxHeight)) {
+        // Fields scroll; the Save/Cancel row stays pinned below them.
         Column(
-            Modifier.heightIn(max = maxHeight).verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
@@ -186,13 +188,14 @@ fun FenceEditor(
             if (draft.activeDays == 0) {
                 Text("Pick at least one day.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (draft.id != 0L) TextButton(onClick = onDelete) { Text("Delete") }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onCancel) { Text("Cancel") }
-                Button(onClick = onSave, enabled = draft.canSave) { Text("Save") }
-            }
         }
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (draft.id != 0L) TextButton(onClick = onDelete) { Text("Delete") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onCancel) { Text("Cancel") }
+            Button(onClick = onSave, enabled = draft.canSave) { Text("Save") }
+        }
+      }
     }
 
     pickingTime?.let { start ->
