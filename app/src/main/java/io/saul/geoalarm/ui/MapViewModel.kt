@@ -11,7 +11,10 @@ import io.saul.geoalarm.data.Settings
 import io.saul.geoalarm.data.TriggerLog
 import io.saul.geoalarm.engine.GeoMath
 import io.saul.geoalarm.engine.GeoPoint
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,12 +115,17 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
         _draft.value = null
     }
 
+    /** Emits newly created fences so the screen can offer an offline download around them. */
+    private val _created = MutableSharedFlow<Fence>(extraBufferCapacity = 1)
+    val created: SharedFlow<Fence> = _created.asSharedFlow()
+
     fun saveDraft() {
         // Saving re-enables a one-shot fence that already fired.
         val d = _draft.value?.takeIf { it.canSave }?.copy(enabled = true) ?: return
         viewModelScope.launch {
-            dao.upsert(d.toFence())
+            val rowId = dao.upsert(d.toFence())
             _draft.value = null
+            if (d.id == 0L) _created.tryEmit(d.toFence().copy(id = rowId))
         }
     }
 

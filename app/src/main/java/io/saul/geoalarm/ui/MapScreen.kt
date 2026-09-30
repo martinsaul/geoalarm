@@ -46,6 +46,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.saul.geoalarm.engine.GeoPoint
+import io.saul.geoalarm.offline.OfflineRegions
+import io.saul.geoalarm.offline.TileMath
+import androidx.compose.material.icons.filled.DownloadForOffline
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import org.maplibre.android.geometry.LatLngBounds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.camera.CameraPosition
@@ -76,6 +82,10 @@ fun MapScreen(modifier: Modifier = Modifier, vm: MapViewModel = viewModel()) {
     var showSettings by remember { mutableStateOf(false) }
     var showCoordinates by remember { mutableStateOf(false) }
     var mapLoadFailed by remember { mutableStateOf(false) }
+    var showOffline by remember { mutableStateOf(false) }
+    var pendingDownload by remember { mutableStateOf<Pair<TileMath.Bounds, String>?>(null) }
+    val offline = remember { OfflineRegions.get(context) }
+    val regions by offline.state.collectAsStateWithLifecycle()
 
     val mapView = remember {
         MapView(context).apply {
@@ -185,6 +195,9 @@ fun MapScreen(modifier: Modifier = Modifier, vm: MapViewModel = viewModel()) {
             }) {
                 Icon(Icons.Default.MyLocation, contentDescription = "My location")
             }
+            FilledTonalIconButton(onClick = { offline.refresh(); showOffline = true }) {
+                Icon(Icons.Default.DownloadForOffline, contentDescription = "Offline maps")
+            }
             FilledTonalIconButton(onClick = { showSettings = true }) {
                 Icon(Icons.Default.Settings, contentDescription = "Settings")
             }
@@ -226,7 +239,7 @@ fun MapScreen(modifier: Modifier = Modifier, vm: MapViewModel = viewModel()) {
         if (mapLoadFailed) {
             Card(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(12.dp).padding(end = 64.dp)) {
                 Text(
-                    "Map not available offline here. Fences and alarms still work: use your location or coordinates.",
+                    "Map not available offline here. Fences and alarms still work: use your location or coordinates. Save areas for offline use under Offline maps.",
                     Modifier.padding(12.dp),
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -249,6 +262,57 @@ fun MapScreen(modifier: Modifier = Modifier, vm: MapViewModel = viewModel()) {
             onToggle = vm::setEnabled,
         )
     }
+    // After creating a fence, offer the map around it for offline use if we don't have it yet.
+    LaunchedEffect(Unit) {
+        vm.created.collect { f ->
+            if (offline.covers(f.latitude, f.longitude)) return@collect
+            val result = snackbar.showSnackbar(
+                "Save the map around \"${f.label}\" for offline use?", actionLabel = "Download", duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                val half = maxOf(f.radiusMeters * 3, 5_000.0)
+                pendingDownload = TileMath.around(f.latitude, f.longitude, half) to "Around ${f.label}"
+            }
+        }
+    }
+
+    if (showOffline) {
+        OfflineSheet(
+            regions = regions,
+            onDismiss = { showOffline = false },
+            onDownloadVisible = {
+                map?.projection?.visibleRegion?.latLngBounds?.let { b ->
+                    showOffline = false
+                    pendingDownload = TileMath.Bounds(b.latitudeSouth, b.longitudeWest, b.latitudeNorth, b.longitudeEast) to
+                        "Area ${regions.size + 1}"
+                }
+            },
+            onToggle = { offline.setActive(it.id, !it.active) },
+            onUpdate = { offline.update(it.id) },
+            onDelete = { offline.delete(it.id) },
+            onShow = { r ->
+                showOffline = false
+                map?.animateCamera(CameraUpdateFactory.newLatLngBounds(
+                    LatLngBounds.from(r.bounds.north, r.bounds.east, r.bounds.south, r.bounds.west), 48,
+                ))
+            },
+        )
+    }
+    pendingDownload?.let { (bounds, name) ->
+        DownloadRegionDialog(
+            bounds = bounds,
+            suggestedName = name,
+            onDismiss = { pendingDownload = null },
+            onConfirm = { chosen ->
+                pendingDownload = null
+                offline.download(chosen, bounds, styleUrl, context.resources.displayMetrics.density) { err ->
+                    scope.launch { snackbar.showSnackbar("Download failed: $err") }
+                }
+                scope.launch { snackbar.showSnackbar("Downloading \"$chosen\". Progress is under Offline maps.") }
+            },
+        )
+    }
+
     if (showSettings) {
         SettingsDialog(current = styleUrl, onDismiss = { showSettings = false }, onSave = {
             vm.setStyleUrl(it)
