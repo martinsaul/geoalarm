@@ -13,7 +13,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                MapScreen(styleUrl = BuildConfig.DEFAULT_STYLE_URL)
+                MapScreen()
             }
         }
     }

@@ -27,4 +27,22 @@ class GeoMathTest {
         val d = GeoMath.distanceMeters(GeoPoint(0.0, 179.9), GeoPoint(0.0, -179.9))
         assertEquals(22_239.0, d, 50.0)
     }
+
+    @Test
+    fun `destination lands at the requested distance`() {
+        val origin = GeoPoint(47.6, -122.3)
+        for (bearing in listOf(0.0, 45.0, 90.0, 180.0, 270.0)) {
+            val p = GeoMath.destination(origin, 1_000.0, bearing)
+            assertEquals(1_000.0, GeoMath.distanceMeters(origin, p), 0.5)
+        }
+    }
+
+    @Test
+    fun `circle ring is closed and on the radius`() {
+        val c = GeoPoint(0.0, 179.99)
+        val ring = GeoMath.circleRing(c, 500.0, segments = 32)
+        assertEquals(33, ring.size)
+        assertEquals(ring.first(), ring.last())
+        ring.forEach { assertEquals(500.0, GeoMath.distanceMeters(c, it), 0.5) }
+    }
 }
