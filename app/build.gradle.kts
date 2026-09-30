@@ -13,8 +13,8 @@ android {
         applicationId = "io.saul.geoalarm"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.3.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Default basemap. OpenFreeMap: OSM vector tiles, no API key, no request limits.
@@ -30,6 +30,17 @@ android {
         }
         create("gms") {
             dimension = "distribution"
+        }
+    }
+
+    // MapLibre ships a native library per ABI (~12 MB each). Per-ABI APKs keep downloads small;
+    // the universal APK stays available for sideloading anywhere.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true
         }
     }
 
@@ -62,6 +73,19 @@ android {
     lint {
         abortOnError = true
         warningsAsErrors = false
+    }
+}
+
+// versionCode = base * 10 + ABI digit, so every per-ABI APK has a distinct, ordered code
+// (the scheme F-Droid expects). Universal = 0: device-specific builds always win on update.
+val abiDigits = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val abi = output.filters.find { it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI }?.identifier
+            val base = output.versionCode.orNull ?: 0
+            output.versionCode.set(base * 10 + (abiDigits[abi] ?: 0))
+        }
     }
 }
 
