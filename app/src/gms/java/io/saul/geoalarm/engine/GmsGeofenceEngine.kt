@@ -27,24 +27,35 @@ class GmsGeofenceEngine(private val context: Context) : GeofenceEngine {
     override suspend fun arm(fences: List<FenceSpec>) {
         client.removeGeofences(pendingIntent).await()
         if (fences.isEmpty()) return
-        val geofences = fences.map { f ->
-            var types = 0
-            if (f.onEnter) types = types or Geofence.GEOFENCE_TRANSITION_ENTER
-            if (f.onExit) types = types or Geofence.GEOFENCE_TRANSITION_EXIT
-            Geofence.Builder()
-                .setRequestId(f.id.toString())
-                .setCircularRegion(f.center.latitude, f.center.longitude, f.radiusMeters.toFloat())
-                .setExpirationDuration(Geofence.NEVER_EXPIRE)
-                .setTransitionTypes(types)
-                .setNotificationResponsiveness(RESPONSIVENESS_MS)
-                .build()
+        // Handover from the local engine: if we last knew you were outside a fence, an ENTER-on-add means
+        // you crossed in during the switch, and vice versa. Fences with no known state don't fire on add,
+        // so creating a fence you're standing in doesn't ring.
+        val known = FenceStateStore(context).load()
+        val groups = fences.groupBy { f ->
+            when (known[f.id]) {
+                false -> GeofencingRequest.INITIAL_TRIGGER_ENTER
+                true -> GeofencingRequest.INITIAL_TRIGGER_EXIT
+                null -> 0
+            }
         }
-        val request = GeofencingRequest.Builder()
-            // No initial trigger: creating a fence you're standing in shouldn't ring.
-            .setInitialTrigger(0)
-            .addGeofences(geofences)
+        for ((initial, group) in groups) {
+            val request = GeofencingRequest.Builder()
+                .setInitialTrigger(initial)
+                .addGeofences(group.map(::toGeofence))
+                .build()
+            client.addGeofences(request, pendingIntent).await()
+        }
+    }
+
+    private fun toGeofence(f: FenceSpec): Geofence {
+        return Geofence.Builder()
+            .setRequestId(f.id.toString())
+            .setCircularRegion(f.center.latitude, f.center.longitude, f.radiusMeters.toFloat())
+            .setExpirationDuration(Geofence.NEVER_EXPIRE)
+            // Always watch both directions so the handover state stays right; the dispatcher filters.
+            .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
+            .setNotificationResponsiveness(RESPONSIVENESS_MS)
             .build()
-        client.addGeofences(request, pendingIntent).await()
     }
 
     override suspend fun disarmAll() {

@@ -3,6 +3,8 @@ package io.saul.geoalarm
 import android.app.Application
 import io.saul.geoalarm.alarm.Notifications
 import io.saul.geoalarm.data.GeoAlarmDatabase
+import android.util.Log
+import io.saul.geoalarm.engine.Connectivity
 import io.saul.geoalarm.engine.GeofenceController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +31,10 @@ class GeoAlarmApp : Application() {
                 .distinctUntilChanged()
                 .debounce(500)
                 .collect { GeofenceController.sync(this@GeoAlarmApp) }
+        }
+        Connectivity.watch(this) { online ->
+            Log.i("GeoAlarmApp", if (online) "Online" else "Offline")
+            resync()
         }
     }
 

@@ -36,6 +36,8 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.runtime.mutableIntStateOf
 import io.saul.geoalarm.engine.GeoPoint
+import io.saul.geoalarm.engine.GeofenceController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,6 +133,15 @@ fun SettingsDialog(current: String, onDismiss: () -> Unit, onSave: (String) -> U
                     modifier = Modifier.fillMaxWidth(),
                 )
                 TextButton(onClick = { url = BuildConfig.DEFAULT_STYLE_URL }) { Text("Reset to OpenFreeMap") }
+                val engine by GeofenceController.active.collectAsStateWithLifecycle()
+                Text(
+                    "Alarm engine: " + when (engine) {
+                        "gms" -> "Google Play Services (online, battery saver)"
+                        "local" -> "Phone GPS (works offline)"
+                        else -> "not running (no active fences or missing permission)"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Text(
                     "Map data (c) OpenStreetMap contributors, ODbL. Tiles by OpenFreeMap.",
                     style = MaterialTheme.typography.bodySmall,

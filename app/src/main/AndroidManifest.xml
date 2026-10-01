@@ -56,6 +56,10 @@
             android:foregroundServiceType="mediaPlayback" />
 
         <receiver
+            android:name=".engine.ResyncReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".alarm.SnoozeReceiver"
             android:exported="false" />
 
